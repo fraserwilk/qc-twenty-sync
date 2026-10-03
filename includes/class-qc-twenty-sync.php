@@ -610,9 +610,10 @@ class QC_Twenty_Sync {
 	/**
 	 * Twenty accountOwnerId from the WP sales rep (user meta qc_sales_rep).
 	 *
-	 * The rep is free text like "Rob Williams (VIC)". Resolve it to a Twenty
-	 * workspace member via the qc_twenty_sales_rep_map filter (label => member
-	 * email), else by member name appearing in the label. Unresolved reps (e.g.
+	 * The rep is text like "Rob Williams (VIC)", chosen from Settings > Sales Reps.
+	 * Resolve it to a Twenty workspace member via that rep's rep_twenty_email
+	 * sub-field (or the qc_twenty_sales_rep_map filter, label => member email),
+	 * else by member name appearing in the label. Unresolved reps (e.g.
 	 * "Head Office") return '' and leave the owner untouched.
 	 */
 	private static function account_owner_id( $user_id, array $map ) {
@@ -625,7 +626,18 @@ class QC_Twenty_Sync {
 			return '';
 		}
 
-		$explicit = apply_filters( 'qc_twenty_sales_rep_map', array() );
+		// Settings > Sales Reps (ACF options repeater). An optional sub-field
+		// rep_twenty_email links a rep to a Twenty workspace member.
+		$acf  = array();
+		$rows = (int) get_option( 'options_qc_sales_reps', 0 );
+		for ( $i = 0; $i < $rows; $i++ ) {
+			$name  = trim( (string) get_option( "options_qc_sales_reps_{$i}_rep_name", '' ) );
+			$email = trim( (string) get_option( "options_qc_sales_reps_{$i}_rep_twenty_email", '' ) );
+			if ( '' !== $name && is_email( $email ) ) {
+				$acf[ $name ] = $email;
+			}
+		}
+		$explicit = apply_filters( 'qc_twenty_sales_rep_map', $acf );
 		if ( isset( $explicit[ $rep ] ) ) {
 			foreach ( $members as $m ) {
 				if ( strtolower( $m['email'] ) === strtolower( $explicit[ $rep ] ) ) {
@@ -729,6 +741,18 @@ class QC_Twenty_Sync {
 		$segment = self::b2b_segment( $user_id );
 		if ( $segment ) {
 			$out['b2Bsegment'] = $segment;
+		}
+
+		// Twenty accountTerms is COD / NET30 / NET60. All retailer accounts are COD.
+		$terms = '';
+		$raw   = self::meta_lookup( $user_id, $map['accountTerms'] );
+		if ( $raw && preg_match( '/^(COD|NET30|NET60)/', strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $raw ) ), $m ) ) {
+			$terms = $m[1];
+		} elseif ( 'RETAILER' === $segment ) {
+			$terms = apply_filters( 'qc_twenty_default_retailer_terms', 'COD', $user_id );
+		}
+		if ( $terms ) {
+			$out['accountTerms'] = $terms;
 		}
 
 		$owner = self::account_owner_id( $user_id, $map );

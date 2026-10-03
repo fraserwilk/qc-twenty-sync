@@ -267,7 +267,7 @@ class QC_Twenty_Client {
 	private function drop_curated_fields( array $data, array $existing ) {
 		$fill_blank = apply_filters(
 			'qc_twenty_fill_blank_company_fields',
-			array( 'address', 'companyEmail', 'companyPhone', 'website', 'dealerId', 'accountOwnerId', 'country' ),
+			array( 'address', 'companyEmail', 'companyPhone', 'website', 'dealerId', 'accountOwnerId', 'country', 'accountTerms' ),
 			$existing
 		);
 
