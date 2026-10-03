@@ -177,12 +177,20 @@ class QC_Omnisend_Sync {
 		}
 
 		self::track( $email, $company['id'] ?? '' );
-		QC_Twenty_Log::add( 'omnisend', (int) ( $company['wpCustomerId'] ?? 0 ), array(
+		self::log_done( 'omnisend', (int) ( $company['wpCustomerId'] ?? 0 ), array(
 			'email'   => $email,
 			'company' => $company['name'] ?? '',
 			'code'    => $res['code'],
-		) );
+		), (int) $res['code'] );
 		return $res;
+	}
+
+	/** These pushes happen inline, not through the queue, so log them as finished. */
+	private static function log_done( $type, $object_id, array $payload, $code ) {
+		$event_id = QC_Twenty_Log::add( $type, $object_id, $payload );
+		if ( $event_id ) {
+			QC_Twenty_Log::update( $event_id, array( 'status' => 'done', 'attempts' => 1, 'response_code' => $code ) );
+		}
 	}
 
 	/** Remove the retailer tag from one contact and stop tracking it. */
@@ -190,7 +198,7 @@ class QC_Omnisend_Sync {
 		$res = $omni->remove_tag( $email, self::TAG );
 		if ( empty( $res['error'] ) ) {
 			self::untrack( $email );
-			QC_Twenty_Log::add( 'omnisend_untag', 0, array( 'email' => $email, 'code' => $res['code'] ) );
+			self::log_done( 'omnisend_untag', 0, array( 'email' => $email, 'code' => $res['code'] ), (int) $res['code'] );
 		}
 		return $res;
 	}

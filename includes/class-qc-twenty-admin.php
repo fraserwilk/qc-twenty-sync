@@ -48,10 +48,16 @@ class QC_Twenty_Admin {
 
 		$live   = isset( $_POST['live'] ) && '1' === $_POST['live'];
 		$offset = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
+		// A live user costs ~10 API calls and a 6s pause, so keep a request under
+		// typical 60-120s server limits. A dry run is cheap.
+		$size   = $live ? 8 : 40;
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 300 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
 		$ids    = get_users(
 			array(
 				'fields'       => 'ID',
-				'number'       => 40,
+				'number'       => $size,
 				'offset'       => $offset,
 				'orderby'      => 'ID',
 				'role__not_in' => array( 'administrator', 'shop_manager', 'editor' ),
@@ -61,7 +67,7 @@ class QC_Twenty_Admin {
 		$rows = QC_Twenty_Sync::backfill_customers( array_map( 'intval', $ids ), ! $live );
 		set_transient(
 			'qc_twenty_backfill_' . get_current_user_id(),
-			array( 'rows' => $rows, 'live' => $live, 'next' => ( 40 === count( $ids ) ) ? $offset + 40 : 0 ),
+			array( 'rows' => $rows, 'live' => $live, 'next' => ( $size === count( $ids ) ) ? $offset + $size : 0 ),
 			600
 		);
 
@@ -71,13 +77,15 @@ class QC_Twenty_Admin {
 
 	private static function render_backfill() {
 		$res = get_transient( 'qc_twenty_backfill_' . get_current_user_id() );
-		echo '<h2>Backfill customers</h2><p>Links existing Twenty Companies to WordPress users and fills blank fields. Dry run first; 40 users per batch.</p>';
+		echo '<h2>Backfill customers</h2><p>Links existing Twenty Companies to WordPress users and fills blank fields. Dry run first (40 users per batch); live runs do 8 users per batch.</p>';
 		foreach ( array( 0 => 'Dry run', 1 => 'Run live' ) as $live => $label ) {
 			echo '<form method="post" style="display:inline-block;margin-right:8px" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 			wp_nonce_field( 'qc_twenty_backfill' );
 			echo '<input type="hidden" name="action" value="qc_twenty_backfill"><input type="hidden" name="live" value="' . (int) $live . '">';
-			echo '<input type="hidden" name="offset" value="' . ( $res ? (int) $res['next'] : 0 ) . '">';
-			submit_button( $label . ( $res && $res['next'] ? ' (next batch)' : '' ), $live ? 'primary' : 'secondary', '', false );
+			// Each mode continues from its own last batch, so a dry run never skips users in a live run.
+			$continues = $res && (bool) $res['live'] === (bool) $live && $res['next'];
+			echo '<input type="hidden" name="offset" value="' . ( $continues ? (int) $res['next'] : 0 ) . '">';
+			submit_button( $label . ( $continues ? ' (next batch)' : ' (first batch)' ), $live ? 'primary' : 'secondary', '', false );
 			echo '</form>';
 		}
 		if ( $res ) {
