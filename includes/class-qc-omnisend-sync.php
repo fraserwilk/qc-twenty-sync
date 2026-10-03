@@ -154,7 +154,12 @@ class QC_Omnisend_Sync {
 			if ( $dry_run ) {
 				continue;
 			}
-			$res = self::untag_email( $omni, $email );
+			$stage = '';
+			if ( $company_id ) {
+				$c     = $twenty->get_record( 'companies', $company_id );
+				$stage = ( $c && empty( $c['error'] ) && $c['body'] && empty( $c['body']['deletedAt'] ) ) ? ( $c['body']['lifecycleStage'] ?? '' ) : '';
+			}
+			$res = self::untag_email( $omni, $email, $stage );
 			if ( ! empty( $res['error'] ) ) {
 				$out['errors'][] = 'untag ' . $email . ': ' . $res['error'];
 			}
@@ -193,9 +198,15 @@ class QC_Omnisend_Sync {
 		}
 	}
 
-	/** Remove the retailer tag from one contact and stop tracking it. */
-	public static function untag_email( QC_Omnisend_Client $omni, $email ) {
-		$res = $omni->remove_tag( $email, self::TAG );
+	/**
+	 * Remove the retailer tag from one contact and stop tracking it.
+	 *
+	 * @param string $stage Company's current lifecycle stage, written to the contact. Empty to leave it.
+	 */
+	public static function untag_email( QC_Omnisend_Client $omni, $email, $stage = '' ) {
+		// Keep qc_lifecycle_stage truthful, so it does not read ACTIVE after the exit.
+		$props = '' !== (string) $stage ? array( 'qc_lifecycle_stage' => (string) $stage ) : array();
+		$res   = $omni->remove_tag( $email, self::TAG, $props );
 		if ( empty( $res['error'] ) ) {
 			self::untrack( $email );
 			self::log_done( 'omnisend_untag', 0, array( 'email' => $email, 'code' => $res['code'] ), (int) $res['code'] );
@@ -238,7 +249,7 @@ class QC_Omnisend_Sync {
 
 		foreach ( self::tracked() as $email => $company_id ) {
 			if ( $company_id === $company['id'] && ! isset( $keep[ $email ] ) ) {
-				$res = self::untag_email( $omni, $email );
+				$res = self::untag_email( $omni, $email, empty( $company['deletedAt'] ) ? ( $company['lifecycleStage'] ?? '' ) : '' );
 				if ( empty( $res['error'] ) ) {
 					$out['untagged']++;
 				} else {

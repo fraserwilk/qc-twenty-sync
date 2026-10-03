@@ -147,9 +147,10 @@ class QC_Omnisend_Client {
 	 * channel exactly as they are. A contact Omnisend does not know is a no-op.
 	 *
 	 * Omnisend replaces the tag array on write, so we send back the remainder.
-	 * An empty array is sent when ours was the only tag.
+	 * An empty array is sent when ours was the only tag. Optional custom
+	 * properties (e.g. the new lifecycle stage) ride along in the same write.
 	 */
-	public function remove_tag( $email, $tag ) {
+	public function remove_tag( $email, $tag, array $custom_properties = array() ) {
 		$existing = $this->existing_contact( $email );
 		if ( ! $existing ) {
 			return array( 'code' => 200, 'body' => null, 'error' => '', 'note' => 'unknown contact' );
@@ -167,20 +168,21 @@ class QC_Omnisend_Client {
 			}
 		}
 
-		return $this->request(
-			'POST',
-			'/contacts',
-			array(
-				'identifiers' => array(
-					array(
-						'type'     => 'email',
-						'id'       => $email,
-						'channels' => array( 'email' => $channel ? $channel : array( 'status' => 'nonSubscribed' ) ),
-					),
+		$body = array(
+			'identifiers' => array(
+				array(
+					'type'     => 'email',
+					'id'       => $email,
+					'channels' => array( 'email' => $channel ? $channel : array( 'status' => 'nonSubscribed' ) ),
 				),
-				'tags'        => array_values( array_diff( $tags, array( $tag ) ) ),
-			)
+			),
+			'tags'        => array_values( array_diff( $tags, array( $tag ) ) ),
 		);
+		if ( $custom_properties ) {
+			$body['customProperties'] = $custom_properties;
+		}
+
+		return $this->request( 'POST', '/contacts', $body );
 	}
 
 	/** The contact as Omnisend holds it, or null when new. */

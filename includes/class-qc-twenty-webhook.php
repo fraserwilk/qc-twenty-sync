@@ -185,7 +185,7 @@ class QC_Twenty_Webhook {
 		if ( $eligible ) {
 			QC_Omnisend_Sync::push_contact( $omni, $person, $company );
 		} elseif ( isset( QC_Omnisend_Sync::tracked()[ strtolower( $email ) ] ) ) {
-			QC_Omnisend_Sync::untag_email( $omni, $email );
+			QC_Omnisend_Sync::untag_email( $omni, $email, $company ? ( $company['lifecycleStage'] ?? '' ) : '' );
 		}
 
 		// An email change leaves the old address tagged. The reconcile untags it;

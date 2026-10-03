@@ -3,7 +3,7 @@
  * Plugin Name:       QC Twenty Sync
  * Plugin URI:        https://qualitycomponents.com.au/
  * Description:       Syncs WordPress accounts to Twenty CRM (applications, approvals, profile edits, order summaries) and Twenty retailers to Omnisend, including a signed webhook for instant updates. Queued with Action Scheduler.
- * Version:           0.2.1
+ * Version:           0.2.2
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Quality Components Pty Ltd
@@ -15,7 +15,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'QC_TWENTY_SYNC_VERSION', '0.2.1' );
+define( 'QC_TWENTY_SYNC_VERSION', '0.2.2' );
 define( 'QC_TWENTY_SYNC_FILE', __FILE__ );
 define( 'QC_TWENTY_SYNC_DIR', plugin_dir_path( __FILE__ ) );
 
