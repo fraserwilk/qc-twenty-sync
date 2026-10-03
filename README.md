@@ -9,7 +9,7 @@ WordPress plugin for Quality Components. It keeps three systems in step:
 
 Current version: **0.2.5**. Requires WordPress 6.0+, PHP 7.4+, WooCommerce and B2BKing. Action Scheduler (bundled with WooCommerce) is used for the queue.
 
-> **Dev-first.** Built and tested on the dev site. Deploy to Live only with approval from Fraser or Simon. Dev and Live use the **same** Twenty and Omnisend accounts, so anything dev pushes is real.
+> **Dev-first.** Built and tested on the dev site. Deploy to Live only with approval from Fraser. Dev and Live use the **same** Twenty and Omnisend accounts, so anything dev pushes is real.
 
 ---
 
