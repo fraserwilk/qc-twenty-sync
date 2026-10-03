@@ -121,9 +121,101 @@ class QC_Twenty_Log {
 		return $wpdb->update( self::table(), $fields, array( 'event_id' => $event_id ) );
 	}
 
-	public static function recent( $limit = 50 ) {
+	/** Views offered on the admin page: slug => label. The first is the default. */
+	public static function views() {
+		return array(
+			'default'        => 'Default (hides hourly Omnisend)',
+			'all'            => 'All',
+			'failed'         => 'Failed',
+			'open'           => 'Pending',
+			'omnisend'       => 'Omnisend pushes',
+			'omnisend_untag' => 'Omnisend untags',
+			'profile'        => 'Profile',
+			'application'    => 'Application',
+			'approved'       => 'Approved',
+			'order'          => 'Order',
+		);
+	}
+
+	/**
+	 * Latest rows, newest first, for one of the views() slugs.
+	 * An unknown slug falls back to the default view.
+	 */
+	public static function recent( $limit = 50, $view = 'default' ) {
 		global $wpdb;
 		$limit = max( 1, min( 200, (int) $limit ) );
-		return $wpdb->get_results( "SELECT * FROM " . self::table() . " ORDER BY id DESC LIMIT {$limit}", ARRAY_A );
+		$table = self::table();
+		$view  = isset( self::views()[ $view ] ) ? $view : 'default';
+
+		switch ( $view ) {
+			case 'all':
+				$where = '1=1';
+				break;
+			case 'failed':
+				$where = "status = 'failed'";
+				break;
+			case 'open':
+				$where = "status IN ('pending','processing')";
+				break;
+			case 'default':
+				$where = "event_type <> 'omnisend'";
+				break;
+			default:
+				$where = $wpdb->prepare( 'event_type = %s', $view ); // Slug already whitelisted by views().
+		}
+
+		return $wpdb->get_results( "SELECT * FROM {$table} WHERE {$where} ORDER BY id DESC LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	/* ---------------------------------------------------------------------
+	 * Retention
+	 * ------------------------------------------------------------------ */
+
+	const PRUNE_HOOK = 'qc_twenty_log_prune';
+
+	public static function init() {
+		add_action( self::PRUNE_HOOK, array( __CLASS__, 'prune' ) );
+		if ( ! wp_next_scheduled( self::PRUNE_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::PRUNE_HOOK );
+		}
+	}
+
+	public static function unschedule() {
+		wp_clear_scheduled_hook( self::PRUNE_HOOK );
+	}
+
+	/**
+	 * Delete old rows. Finished rows go after 30 days; failed and stuck rows are
+	 * kept for 90 so problems stay inspectable. Both are filterable.
+	 *
+	 * @return int Rows deleted.
+	 */
+	public static function prune() {
+		global $wpdb;
+		$table       = self::table();
+		$done_days   = max( 1, (int) apply_filters( 'qc_twenty_log_keep_days', 30 ) );
+		$failed_days = max( $done_days, (int) apply_filters( 'qc_twenty_log_keep_days_failed', 90 ) );
+		$done_before = gmdate( 'Y-m-d H:i:s', time() - $done_days * DAY_IN_SECONDS );
+		$fail_before = gmdate( 'Y-m-d H:i:s', time() - $failed_days * DAY_IN_SECONDS );
+
+		$deleted = 0;
+		// Chunked so a large backlog does not hold a long table lock.
+		for ( $i = 0; $i < 50; $i++ ) {
+			$n = (int) $wpdb->query(
+				$wpdb->prepare(
+					"DELETE FROM {$table}
+					 WHERE ( status IN ('done','skipped') AND created_at < %s )
+					    OR ( status NOT IN ('done','skipped') AND created_at < %s )
+					 LIMIT 1000", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$done_before,
+					$fail_before
+				)
+			);
+			$deleted += $n;
+			if ( $n < 1000 ) {
+				break;
+			}
+		}
+		return $deleted;
 	}
 }

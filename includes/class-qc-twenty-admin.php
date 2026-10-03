@@ -98,7 +98,10 @@ class QC_Twenty_Admin {
 	}
 
 	public static function render() {
-		$rows = QC_Twenty_Log::recent( 100 );
+		$views = QC_Twenty_Log::views();
+		$view  = isset( $_GET['view'] ) ? sanitize_key( wp_unslash( $_GET['view'] ) ) : 'default'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$view  = isset( $views[ $view ] ) ? $view : 'default';
+		$rows  = QC_Twenty_Log::recent( 100, $view );
 		echo '<div class="wrap"><h1>QC Twenty Sync</h1>';
 		echo '<p>Queued pushes to Twenty CRM. Key is read from the <code>QC_TWENTY_API_KEY</code> constant.</p>';
 
@@ -107,7 +110,15 @@ class QC_Twenty_Admin {
 		}
 
 		self::render_backfill();
-		echo '<h2>Event log</h2><table class="widefat striped"><thead><tr>';
+		echo '<h2>Event log</h2><p>';
+		$links = array();
+		foreach ( $views as $slug => $label ) {
+			$url     = esc_url( add_query_arg( array( 'page' => 'qc-twenty-sync', 'view' => $slug ), admin_url( 'tools.php' ) ) );
+			$links[] = $slug === $view ? '<strong>' . esc_html( $label ) . '</strong>' : '<a href="' . $url . '">' . esc_html( $label ) . '</a>';
+		}
+		echo implode( ' | ', $links ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built from escaped parts above.
+		echo '<p class="description">Showing the latest 100. Finished rows are deleted after 30 days, failed rows after 90.</p>';
+		echo '<table class="widefat striped"><thead><tr>';
 		foreach ( array( 'When (UTC)', 'Event', 'WP ID', 'Status', 'Tries', 'Code', 'Last error', '' ) as $th ) {
 			echo '<th>' . esc_html( $th ) . '</th>';
 		}
