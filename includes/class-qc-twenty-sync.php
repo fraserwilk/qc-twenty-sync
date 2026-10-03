@@ -755,6 +755,13 @@ class QC_Twenty_Sync {
 			$out['accountTerms'] = $terms;
 		}
 
+		// Reps are not Twenty workspace members, so the rep goes in as text (Twenty
+		// field salesRep). WordPress owns it: Settings > Sales Reps is the source.
+		$rep = trim( (string) self::meta_lookup( $user_id, $map['salesRep'] ) );
+		if ( '' !== $rep ) {
+			$out['salesRep'] = $rep;
+		}
+
 		$owner = self::account_owner_id( $user_id, $map );
 		if ( $owner ) {
 			$out['accountOwnerId'] = $owner;
