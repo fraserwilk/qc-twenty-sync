@@ -7,7 +7,7 @@ WordPress plugin for Quality Components. It keeps three systems in step:
         (accounts, orders)            (system of record)   (email marketing)
 ```
 
-Current version: **0.2.5**. Requires WordPress 6.0+, PHP 7.4+, WooCommerce and B2BKing. Action Scheduler (bundled with WooCommerce) is used for the queue.
+Current version: **0.2.6**. Requires WordPress 6.0+, PHP 7.4+, WooCommerce and B2BKing. Action Scheduler (bundled with WooCommerce) is used for the queue.
 
 > **Dev-first.** Built and tested on the dev site. Deploy to Live only with approval from Fraser. Dev and Live use the **same** Twenty and Omnisend accounts, so anything dev pushes is real.
 
@@ -101,13 +101,13 @@ A match is updated and stamped with `externalAccountId`, `wpCustomerId` and `wpA
 | `tradingName`, `legalName` | `billing_company`, else B2BKing Company Name field (`b2bking_custom_field_18`) | Yes |
 | `name` | same as trading name | **Only when creating.** The curated Twenty name is never overwritten. |
 | `abn` | `billing_vat` (B2BKing ABN field), stored digits-only; placeholders like `999999999` ignored | Yes |
-| `gstRegistered` | explicit meta if present, else **true when a valid 11-digit ABN exists** | Yes |
+| `gstRegistered` | explicit `qc_gst_registered` user meta if present (yes/no, including `0`), else **true when a valid 11-digit ABN exists** | **Fill-blank only**: correct it in Twenty and it sticks |
 | `b2Bsegment` | B2BKing group title: *Retailer* → RETAILER, *OEM* → OEM | Yes |
 | `accountTerms` | explicit value if present, else **COD for retailers** | **Fill-blank only** |
 | `salesRep` (text) | `qc_sales_rep` user meta, chosen from **Settings → Sales Reps** | Yes |
 | `accountOwnerId` | rep → Twenty workspace member (see §3.5) | **Fill-blank only** |
 | `address` | billing address 1+2, city, state, postcode, country | **Fill-blank only** |
-| `companyEmail`, `companyPhone`, `website`, `dealerId`, `country` | billing email / phone, website meta, dealer id meta, billing country (AU/NZ) | **Fill-blank only** |
+| `companyEmail`, `companyPhone`, `website`, `dealerId`, `country` | billing email (else the account email) / phone, the user's core **Website** field (`user_url`, else `billing_website`/`website` meta), `qc_dealer_id` meta, billing country (AU/NZ) | **Fill-blank only** |
 | `lifecycleStage` | APPLICANT on application, ACTIVE on approval | Only on those two events |
 | `orderCount`, `lastOrderDate`, `lastOrderValue`, `lifetimeOrderValue`, `lastOrderSummaryRefreshed` | WooCommerce orders in `processing`, `completed`, `on-hold`, **ex GST** | Yes (recounted) |
 | Person: name, email, phone, `jobTitle` | billing name / email / phone, job-title meta | Yes |
