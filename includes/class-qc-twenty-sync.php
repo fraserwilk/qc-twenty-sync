@@ -168,10 +168,9 @@ class QC_Twenty_Sync {
 
 		$payload = json_decode( (string) $row['payload'], true );
 
-		// Rebuild from current WordPress data, not the value captured at queue time.
-		// Two orders in quick succession would otherwise push a stale count, and
-		// B2BKing saves some account data (e.g. the group) just after its hooks fire.
-		if ( in_array( $row['event_type'], array( 'order', 'profile', 'application', 'approved' ), true ) ) {
+		// Order summaries must be current, not the value captured at queue time.
+		// Two orders in quick succession would otherwise push a stale count.
+		if ( in_array( $row['event_type'], array( 'order', 'profile' ), true ) ) {
 			$fresh = self::build_payload( $row['event_type'], (int) $row['wp_object_id'] );
 			if ( ! empty( $fresh ) ) {
 				$payload = $fresh;
@@ -711,12 +710,7 @@ class QC_Twenty_Sync {
 			);
 		}
 
-		// New registrations often have no billing_email; use the account email.
 		$email = get_user_meta( $user_id, 'billing_email', true );
-		if ( ! is_email( $email ) ) {
-			$account = get_userdata( $user_id );
-			$email   = $account ? $account->user_email : '';
-		}
 		if ( is_email( $email ) ) {
 			$out['companyEmail'] = array( 'primaryEmail' => $email );
 		}
@@ -726,13 +720,7 @@ class QC_Twenty_Sync {
 			$out['companyPhone'] = self::phone_field( $phone, ( 'NZ' === $ctry ) ? 'NZ' : 'AU' );
 		}
 
-		// The core Users > Website field (user_url) is the main source; the meta
-		// keys are a fallback for sites that store it elsewhere.
-		$account = get_userdata( $user_id );
-		$web     = $account ? trim( (string) $account->user_url ) : '';
-		if ( '' === $web ) {
-			$web = (string) self::meta_lookup( $user_id, $map['website'] );
-		}
+		$web = self::meta_lookup( $user_id, $map['website'] );
 		if ( $web ) {
 			$out['website'] = array( 'primaryLinkUrl' => esc_url_raw( $web ) );
 		}
@@ -742,20 +730,9 @@ class QC_Twenty_Sync {
 			$out['dealerId'] = (string) $dealer;
 		}
 
-		// An explicit value wins, including "0" / "no". meta_lookup() treats those as
-		// empty, so look for the key's presence instead.
-		$gst = null;
-		foreach ( $map['gst'] as $key ) {
-			if ( metadata_exists( 'user', $user_id, $key ) ) {
-				$raw = strtolower( trim( (string) get_user_meta( $user_id, $key, true ) ) );
-				if ( '' !== $raw ) {
-					$gst = in_array( $raw, array( '1', 'yes', 'true', 'on' ), true );
-					break;
-				}
-			}
-		}
-		if ( null !== $gst ) {
-			$out['gstRegistered'] = $gst;
+		$gst = self::meta_lookup( $user_id, $map['gst'] );
+		if ( '' !== $gst ) {
+			$out['gstRegistered'] = in_array( strtolower( (string) $gst ), array( '1', 'yes', 'true', 'on' ), true );
 		} elseif ( self::normalise_abn( self::meta_lookup( $user_id, $map['abn'] ) ) ) {
 			// Fallback: a valid 11-digit ABN is treated as GST registered.
 			$out['gstRegistered'] = true;
